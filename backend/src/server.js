@@ -48,6 +48,15 @@ function computeConfidence(plan, data) {
   };
 }
 
+function isValidQuery(query) {
+  return (
+    !!query &&
+    (Array.isArray(query.measures) ||
+      Array.isArray(query.dimensions) ||
+      Array.isArray(query.timeDimensions))
+  );
+}
+
 app.post('/api/rag', async (req, res) => {
   const t0 = Date.now();
   const steps = [];
@@ -59,21 +68,22 @@ app.post('/api/rag', async (req, res) => {
     }
     const q = question.trim();
 
-    // ① 自然语言 → Cube.js Query JSON（LLM）
+    // ① 自然语言 → Cube.js Query JSON（LLM）；无效时带纠正提示重试一次
     let t = Date.now();
-    const plan = await planQuery(q);
+    let plan = await planQuery(q);
     steps.push({ id: 'plan', label: 'LLM 生成查询 JSON', ms: Date.now() - t, ok: true });
 
+    if (!isValidQuery(plan?.query)) {
+      t = Date.now();
+      plan = await planQuery(q, JSON.stringify(plan));
+      steps.push({ id: 'plan_retry', label: 'LLM 重试生成查询 JSON', ms: Date.now() - t, ok: true });
+    }
+
     const query = plan?.query;
-    if (
-      !query ||
-      (!Array.isArray(query.measures) &&
-        !Array.isArray(query.dimensions) &&
-        !Array.isArray(query.timeDimensions))
-    ) {
+    if (!isValidQuery(query)) {
       steps.push({ id: 'validate', label: '查询校验', ms: 0, ok: false, detail: 'LLM 返回的查询 JSON 无效' });
       return res.status(422).json({
-        error: 'LLM 返回的查询 JSON 无效',
+        error: 'LLM 返回的查询 JSON 无效（已自动重试一次）',
         raw: plan,
         audit: { steps, totalMs: Date.now() - t0 },
       });

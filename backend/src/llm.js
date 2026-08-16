@@ -55,16 +55,24 @@ export function extractJSON(text) {
   }
 }
 
-// 第一步：自然语言 → Cube.js Query JSON
-export async function planQuery(question) {
+// 第一步：自然语言 → Cube.js Query JSON。
+// retryHint 可选：上一次输出无效时传入，让 LLM 按纠正提示再生成一次。
+export async function planQuery(question, retryHint) {
   const { buildQuerySystemPrompt } = await import('./prompt.js');
-  const content = await chatCompletion(
-    [
-      { role: 'system', content: buildQuerySystemPrompt() },
-      { role: 'user', content: question },
-    ],
-    { temperature: 0, json: true },
-  );
+  const messages = [
+    { role: 'system', content: buildQuerySystemPrompt() },
+    { role: 'user', content: question },
+  ];
+  if (retryHint) {
+    messages.push({
+      role: 'user',
+      content:
+        'Your previous response was not a valid query plan. ' +
+        `It was: ${retryHint}. ` +
+        'Return ONLY a valid JSON object with a "query" field containing a Cube.js query that includes at least one of the "measures", "dimensions", or "timeDimensions" arrays.',
+    });
+  }
+  const content = await chatCompletion(messages, { temperature: 0, json: true });
   return extractJSON(content);
 }
 
