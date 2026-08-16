@@ -140,6 +140,20 @@ header .muted {
   margin-bottom: 6px;
 }
 
+.view-tag {
+  display: inline-block;
+  font-size: 11px;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 6px;
+  margin-bottom: 6px;
+}
+
+.chart-wrap {
+  margin-top: 2px;
+}
+
 .table-wrap {
   overflow-x: auto;
   border: 1px solid var(--border);

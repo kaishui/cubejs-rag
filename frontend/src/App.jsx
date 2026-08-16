@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { askRag } from './api.js';
+import DataView, { DataTable } from './DataView.jsx';
 
 const EXAMPLES = [
   '2023年汇丰净利息收入是多少？',
@@ -21,33 +22,6 @@ function ConfidenceBadge({ value }) {
     <span className={`conf conf-${level}`} title="基于 LLM 自评 + 是否取到数据的启发式置信度">
       置信度 {v}% · {label}
     </span>
-  );
-}
-
-function DataTable({ data }) {
-  if (!data || data.length === 0) return <p className="muted">（无数据）</p>;
-  const columns = Object.keys(data[0]);
-  return (
-    <div className="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            {columns.map((c) => (
-              <th key={c}>{c}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {data.map((row, i) => (
-            <tr key={i}>
-              {columns.map((c) => (
-                <td key={c}>{String(row[c])}</td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
   );
 }
 
@@ -76,6 +50,11 @@ function AuditLog({ result }) {
           <div className="audit-row">
             <div className="audit-label">查询 JSON</div>
             <pre>{JSON.stringify(result.query, null, 2)}</pre>
+          </div>
+
+          <div className="audit-row">
+            <div className="audit-label">原始数据</div>
+            <DataTable data={result.data} />
           </div>
 
           {steps.length > 0 && (
@@ -142,7 +121,7 @@ function AssistantMessage({ result, error }) {
 
       <div className="data-section">
         <div className="section-title">数据</div>
-        <DataTable data={result.data} />
+        <DataView data={result.data} annotation={result.annotation} />
       </div>
 
       <AuditLog result={result} />
