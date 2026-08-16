@@ -1,4 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { askRag } from './api.js';
 import DataView, { DataTable } from './DataView.jsx';
 
@@ -120,7 +122,9 @@ function AssistantMessage({ result }) {
   return (
     <div className="bubble assistant">
       <div className="bubble-label">助手</div>
-      <div className="answer-text">{result.answer}</div>
+      <div className="answer-text markdown-body">
+        <ReactMarkdown remarkPlugins={[remarkGfm]}>{result.answer}</ReactMarkdown>
+      </div>
 
       {typeof result.confidence === 'number' && !degraded && (
         <div className="result-meta">

@@ -15,8 +15,10 @@ const COLORS = ['#38bdf8', '#4ade80', '#facc15', '#f87171', '#a78bfa', '#fb923c'
 export function fmtNum(v) {
   const n = Number(v);
   if (!Number.isFinite(n)) return String(v);
-  if (Math.abs(n) >= 1e9) return `${(n / 1e9).toFixed(2)}B`;
-  if (Math.abs(n) >= 1e6) return `${(n / 1e6).toFixed(2)}M`;
+  const abs = Math.abs(n);
+  if (abs >= 1e9) return `${(n / 1e9).toFixed(2)}B`;
+  if (abs >= 1e6) return `${(n / 1e6).toFixed(2)}M`;
+  if (abs >= 1e3) return n.toLocaleString('en-US', { maximumFractionDigits: 0 });
   return n.toLocaleString('en-US', { maximumFractionDigits: 2 });
 }
 
@@ -27,16 +29,64 @@ function fmtX(x, granularity) {
   return s.slice(0, 10);
 }
 
-export function DataTable({ data }) {
+// 由 annotation 构建列元数据：{ [fullKey]: { kind: measure|dimension|time, shortTitle, format, ... } }
+function buildColumnMeta(annotation) {
+  const meta = {};
+  if (!annotation) return meta;
+  const add = (obj, kind) => {
+    for (const [k, v] of Object.entries(obj || {})) {
+      meta[k] = { kind, ...v };
+    }
+  };
+  add(annotation.measures, 'measure');
+  add(annotation.dimensions, 'dimension');
+  add(annotation.timeDimensions, 'time');
+  return meta;
+}
+
+// 去掉冗余的原始时间列：当存在 "Cube.dim.year" 时，隐藏 "Cube.dim"
+function visibleColumns(rowKeys, meta) {
+  const drop = new Set();
+  for (const k of rowKeys) {
+    if (meta[k]?.kind === 'time' && k.split('.').length <= 2) {
+      const hasGranularity = rowKeys.some((rk) => rk.startsWith(`${k}.`) && meta[rk]?.kind === 'time');
+      if (hasGranularity) drop.add(k);
+    }
+  }
+  return rowKeys.filter((k) => !drop.has(k));
+}
+
+function columnLabel(key, meta) {
+  const m = meta[key];
+  if (m?.shortTitle) return m.shortTitle;
+  if (m?.title) return m.title;
+  return key.split('.').pop();
+}
+
+function formatCell(value, key, meta) {
+  if (value == null || value === '') return '—';
+  const m = meta[key];
+  if (!m) return String(value);
+  if (m.kind === 'time') return fmtX(value, key.split('.').pop());
+  const n = Number(value);
+  if (Number.isFinite(n)) {
+    if (m.kind === 'measure' && m.format === 'currency') return `$${fmtNum(n)}`;
+    return fmtNum(n);
+  }
+  return String(value);
+}
+
+export function DataTable({ data, annotation }) {
   if (!data || data.length === 0) return <p className="muted">（无数据）</p>;
-  const columns = Object.keys(data[0]);
+  const meta = buildColumnMeta(annotation);
+  const columns = visibleColumns(Object.keys(data[0]), meta);
   return (
     <div className="table-wrap">
       <table>
         <thead>
           <tr>
             {columns.map((c) => (
-              <th key={c}>{c}</th>
+              <th key={c}>{columnLabel(c, meta)}</th>
             ))}
           </tr>
         </thead>
@@ -44,7 +94,7 @@ export function DataTable({ data }) {
           {data.map((row, i) => (
             <tr key={i}>
               {columns.map((c) => (
-                <td key={c}>{String(row[c])}</td>
+                <td key={c}>{formatCell(row[c], c, meta)}</td>
               ))}
             </tr>
           ))}
@@ -172,7 +222,7 @@ export default function DataView({ data, annotation }) {
     return (
       <div>
         <span className="view-tag">表格</span>
-        <DataTable data={data} />
+        <DataTable data={data} annotation={annotation} />
       </div>
     );
   }
