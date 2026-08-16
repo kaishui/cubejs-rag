@@ -1,0 +1,61 @@
+# Render Blueprint：一键创建 cubejs + backend 两个 web service
+# 使用：Render Dashboard → New → Blueprint → 选择本仓库
+# 注意：Supabase PostgreSQL 是外部托管数据库，不在此蓝图内；敏感值用 sync:false 在 Render 面板填写。
+services:
+  # ---------------------------------------------------------
+  # Cube.js 语义层服务（监听 Render 注入的 $PORT，默认 10000）
+  # ---------------------------------------------------------
+  - type: web
+    name: cubejs
+    runtime: docker
+    rootDir: cubejs
+    plan: free
+    healthCheckPath: /livez
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: CUBEJS_DB_TYPE
+        value: postgres
+      - key: CUBEJS_DB_HOST
+        sync: false          # 例如 aws-0-ap-southeast-2.pooler.supabase.com
+      - key: CUBEJS_DB_PORT
+        value: '5432'        # Supabase 会话池（session pooler）
+      - key: CUBEJS_DB_NAME
+        value: postgres
+      - key: CUBEJS_DB_USER
+        sync: false          # 例如 postgres.<project_ref>
+      - key: CUBEJS_DB_PASS
+        sync: false
+      - key: CUBEJS_DB_SSL
+        value: 'true'
+      - key: CUBEJS_API_SECRET
+        generateValue: true  # 自动生成，供 backend 通过 fromService 复用
+      - key: CUBEJS_CACHE_AND_QUEUE_DRIVER
+        value: memory        # 免费层无磁盘，用内存驱动避免依赖 Cube Store
+
+  # ---------------------------------------------------------
+  # Node.js 后端（RAG 服务）
+  # ---------------------------------------------------------
+  - type: web
+    name: backend
+    runtime: docker
+    rootDir: backend
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      # Render 私网内用服务名互通：http://<service-name>:10000
+      - key: CUBEJS_URL
+        value: http://cubejs:10000/cubejs-api/v1/load
+      - key: CUBEJS_META_URL
+        value: http://cubejs:10000/cubejs-api/v1/meta
+      - key: CUBEJS_API_SECRET
+        fromService:
+          name: cubejs
+          type: web
+          envVarKey: CUBEJS_API_SECRET
+      - key: DEEPSEEK_API_KEY
+        sync: false          # DeepSeek API Key
+      - key: DEEPSEEK_BASE_URL
+        value: https://api.deepseek.com/v1
+      - key: DEEPSEEK_MODEL
+        value: deepseek-chat

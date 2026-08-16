@@ -1,0 +1,50 @@
+version: '3.8'
+
+# 本地一键启动：Cube.js + 后端 + 前端
+# 数据库使用 Supabase 托管 PostgreSQL（无需本地 postgres），配置来自根目录 .env
+services:
+  cubejs:
+    image: cubejs/cube:latest
+    container_name: rag_cubejs
+    ports:
+      - '4000:4000'
+    environment:
+      CUBEJS_DB_TYPE: postgres
+      CUBEJS_DB_HOST: ${CUBEJS_DB_HOST}
+      CUBEJS_DB_PORT: ${CUBEJS_DB_PORT:-5432}
+      CUBEJS_DB_NAME: ${CUBEJS_DB_NAME}
+      CUBEJS_DB_USER: ${CUBEJS_DB_USER}
+      CUBEJS_DB_PASS: ${CUBEJS_DB_PASS}
+      CUBEJS_DB_SSL: ${CUBEJS_DB_SSL:-true}
+      CUBEJS_API_SECRET: ${CUBEJS_API_SECRET}
+      CUBEJS_DEV_MODE: ${CUBEJS_DEV_MODE:-true}
+      CUBEJS_CACHE_AND_QUEUE_DRIVER: memory
+    volumes:
+      - ./cubejs/model:/cube/conf/model
+    restart: unless-stopped
+
+  backend:
+    build: ./backend
+    container_name: rag_backend
+    ports:
+      - '3001:3001'
+    environment:
+      PORT: '3001'
+      CUBEJS_URL: http://cubejs:4000/cubejs-api/v1/load
+      CUBEJS_META_URL: http://cubejs:4000/cubejs-api/v1/meta
+      CUBEJS_API_SECRET: ${CUBEJS_API_SECRET}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY}
+      DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com/v1}
+      DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-chat}
+    depends_on:
+      - cubejs
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    container_name: rag_frontend
+    ports:
+      - '8080:80'
+    depends_on:
+      - backend
+    restart: unless-stopped
