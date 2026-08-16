@@ -28,8 +28,11 @@ Available Cube.js semantic layer — use ONLY these objects:
 
 ${renderSemanticLayer()}
 
-Bank routing — choose the cube that matches the bank mentioned in the question:
+Bank routing — choose the cube based on the question:
+- Single-bank question → use the matching bank cube:
 ${renderBankRouting()}
+- Cross-bank / comparison question (e.g. "compare NII across banks", "which bank has the highest NII", "5 banks NII trend") → use cube "BankIncomeStatement" and add its "bank" dimension to "dimensions"
+- If no bank is mentioned and it is not a comparison, default to "HsbcIncomeStatement"
 
 Return ONLY a single JSON object (no markdown fences, no extra text) with exactly these fields:
 - "question": string — restate the user's question
@@ -38,14 +41,16 @@ Return ONLY a single JSON object (no markdown fences, no extra text) with exactl
 - "confidence": number between 0 and 1 — how confident you are that the query matches the question
 
 Rules for "query":
-- Use fully-qualified member names of the selected bank cube, e.g. "JpmorganIncomeStatement.netInterestIncome"
-- Route to the bank cube matching the question; if no bank is mentioned, default to "HsbcIncomeStatement"
-- Put measures in "measures", time filters in "timeDimensions"
-- For time, use the selected cube's "periodDate" dimension (e.g. "JpmorganIncomeStatement.periodDate"), granularity "year", and "dateRange" as an ISO date array like ["2023-01-01","2023-12-31"]
-- Use "order" for sorting, e.g. {"JpmorganIncomeStatement.periodDate":"asc"}
+- Use fully-qualified member names of the selected cube, e.g. "JpmorganIncomeStatement.netInterestIncome"
+- Put measures in "measures", group-by dimensions in "dimensions", time filters in "timeDimensions"
+- For time, use the selected cube's "periodDate" dimension, granularity "year", and "dateRange" as an ISO date array like ["2023-01-01","2023-12-31"]
+- Use "order" for sorting, e.g. {"BankIncomeStatement.periodDate":"asc"}
 
-Example — user asks "What was JPMorgan's net interest income in 2023?":
-{"question":"What was JPMorgan's net interest income in 2023?","query":{"measures":["JpmorganIncomeStatement.netInterestIncome"],"timeDimensions":[{"dimension":"JpmorganIncomeStatement.periodDate","granularity":"year","dateRange":["2023-01-01","2023-12-31"]}]},"reasoning":"Routed to the JPMorgan cube and filtered to 2023.","confidence":0.95}`;
+Example 1 — user asks "What was JPMorgan's net interest income in 2023?":
+{"question":"What was JPMorgan's net interest income in 2023?","query":{"measures":["JpmorganIncomeStatement.netInterestIncome"],"timeDimensions":[{"dimension":"JpmorganIncomeStatement.periodDate","granularity":"year","dateRange":["2023-01-01","2023-12-31"]}]},"reasoning":"Routed to the JPMorgan cube and filtered to 2023.","confidence":0.95}
+
+Example 2 — user asks "Compare the NII of all banks over the last 5 years":
+{"question":"Compare the NII of all banks over the last 5 years","query":{"measures":["BankIncomeStatement.netInterestIncome"],"dimensions":["BankIncomeStatement.bank"],"timeDimensions":[{"dimension":"BankIncomeStatement.periodDate","granularity":"year","dateRange":["2020-01-01","2024-12-31"]}],"order":{"BankIncomeStatement.periodDate":"asc"}},"reasoning":"Use the unified BankIncomeStatement cube grouped by bank.","confidence":0.9}`;
 }
 
 export function buildAnswerSystemPrompt() {
@@ -53,7 +58,7 @@ export function buildAnswerSystemPrompt() {
 
 Rules:
 - Answer ONLY from the provided result data; never invent any numbers
-- State which bank the numbers are for
+- State which bank(s) the numbers are for
 - Amounts are in US dollars; you may convert to "billion USD" for readability and state the conversion
 - Answer in the same language as the user's question
 - If the result is empty, say clearly that no matching data was found`;

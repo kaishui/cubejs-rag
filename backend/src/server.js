@@ -29,7 +29,7 @@ function clamp01(v) {
 // 置信度 = LLM 自评（plan.confidence）+ 简单启发式（是否取到数据 / 有无 reasoning）
 function computeConfidence(plan, data) {
   const llm = clamp01(Number(plan?.confidence));
-  const base = llm ?? 0.6; // LLM 未给 confidence 时的默认值
+  const base = llm ?? 0.6;
   let final = base;
 
   const dataFound = Array.isArray(data) && data.length > 0;
@@ -57,17 +57,31 @@ function isValidQuery(query) {
   );
 }
 
+const FRIENDLY_FALLBACK = '抱歉，这个问题我暂时没能回答好。请换一种问法，或稍后再试。';
+
 app.post('/api/rag', async (req, res) => {
   const t0 = Date.now();
   const steps = [];
+  const q = String(req.body?.question ?? '').trim();
+
+  // 兜底：永远返回 200 + 友好信息，绝不把原始错误抛给用户
+  const graceful = (extra = {}) =>
+    res.status(200).json({
+      question: q,
+      answer: extra.answer ?? FRIENDLY_FALLBACK,
+      degraded: true,
+      message: extra.message ?? '处理过程中遇到问题',
+      detail: extra.detail ?? null,
+      confidence: null,
+      data: [],
+      audit: { steps, totalMs: Date.now() - t0, ...(extra.auditExtra ?? {}) },
+    });
+
+  if (!q) {
+    return graceful({ answer: '请先输入一个问题。', message: 'question 不能为空' });
+  }
 
   try {
-    const { question } = req.body ?? {};
-    if (!question || typeof question !== 'string' || !question.trim()) {
-      return res.status(400).json({ error: 'question 必填，且必须是字符串' });
-    }
-    const q = question.trim();
-
     // ① 自然语言 → Cube.js Query JSON（LLM）；无效时带纠正提示重试一次
     let t = Date.now();
     let plan = await planQuery(q);
@@ -82,10 +96,10 @@ app.post('/api/rag', async (req, res) => {
     const query = plan?.query;
     if (!isValidQuery(query)) {
       steps.push({ id: 'validate', label: '查询校验', ms: 0, ok: false, detail: 'LLM 返回的查询 JSON 无效' });
-      return res.status(422).json({
-        error: 'LLM 返回的查询 JSON 无效（已自动重试一次）',
-        raw: plan,
-        audit: { steps, totalMs: Date.now() - t0 },
+      return graceful({
+        message: '查询理解失败',
+        detail: 'LLM 返回的查询 JSON 无效',
+        auditExtra: { error: 'LLM 返回的查询 JSON 无效' },
       });
     }
 
@@ -110,18 +124,11 @@ app.post('/api/rag', async (req, res) => {
       annotation: cubeResult.annotation ?? null,
       answer,
       confidence: confidence.final,
-      audit: {
-        steps,
-        totalMs: Date.now() - t0,
-        confidence,
-      },
+      audit: { steps, totalMs: Date.now() - t0, confidence },
     });
   } catch (err) {
     console.error('[rag]', err);
-    res.status(500).json({
-      error: err.message,
-      audit: { steps, totalMs: Date.now() - t0 },
-    });
+    return graceful({ detail: err.message, auditExtra: { error: err.message } });
   }
 });
 

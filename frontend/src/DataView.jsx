@@ -54,35 +54,69 @@ export function DataTable({ data }) {
   );
 }
 
-// 判断能否画折线图：有 1 个时间维度 + 至少 1 个数值 measure + 至少 2 个点
+// 判断能否画折线图，并构建折线数据：
+// 1) 有时间维度 + 数值 measure + ≥2 点；
+// 2) 若有类别维度（如 bank）且取值 ≥2，则每个类别一条线（跨银行对比）。
 function buildChart(data, annotation) {
   if (!Array.isArray(data) || data.length < 2) return null;
 
   const rowKeys = Object.keys(data[0]);
+
   const timeDims = annotation?.timeDimensions ?? {};
   const timeKeys = Object.keys(timeDims).filter((k) => rowKeys.includes(k));
-  if (timeKeys.length === 0) return null;
-  // 优先取带 granularity 后缀的键（如 ...periodDate.year），标签更友好
   timeKeys.sort((a, b) => b.split('.').length - a.split('.').length);
   const xKey = timeKeys[0];
 
   const measures = annotation?.measures ?? {};
-  const series = Object.keys(measures)
-    .filter((k) => rowKeys.includes(k))
-    .filter((k) => data.every((r) => Number.isFinite(Number(r[k]))))
-    .map((k) => ({
-      key: k,
-      name: measures[k]?.shortTitle || measures[k]?.title || k.split('.').pop(),
-    }));
-  if (series.length === 0) return null;
+  const measureKeys = Object.keys(measures).filter(
+    (k) => rowKeys.includes(k) && data.every((r) => Number.isFinite(Number(r[k]))),
+  );
 
+  if (!xKey || measureKeys.length === 0) return null;
+
+  const dims = annotation?.dimensions ?? {};
+  const groupKeys = Object.keys(dims).filter(
+    (k) => rowKeys.includes(k) && !timeKeys.includes(k) && !measureKeys.includes(k),
+  );
+
+  const granularity = xKey.split('.').pop();
+
+  // 跨银行/跨类别：每个类别一条线
+  if (groupKeys.length > 0) {
+    const gKey = groupKeys[0];
+    const groups = [...new Set(data.map((r) => String(r[gKey])))];
+    if (groups.length >= 2) {
+      const yKey = measureKeys[0];
+      const indexByGroup = {};
+      groups.forEach((g, i) => {
+        indexByGroup[g] = `g${i}`;
+      });
+      const series = groups.map((g, i) => ({ key: `g${i}`, name: g }));
+
+      const byX = {};
+      for (const r of data) {
+        const x = String(r[xKey]);
+        byX[x] = byX[x] || { x };
+        byX[x][indexByGroup[String(r[gKey])]] = Number(r[yKey]);
+      }
+      const points = Object.values(byX).sort((a, b) => (a.x < b.x ? -1 : 1));
+
+      return { xKey, granularity, series, points, grouped: true };
+    }
+  }
+
+  // 单银行：每个 measure 一条线
+  const series = measureKeys.map((k) => ({
+    key: k,
+    name: measures[k]?.shortTitle || measures[k]?.title || k.split('.').pop(),
+  }));
   const points = data.map((r) => {
-    const p = { x: r[xKey] };
+    const p = { x: String(r[xKey]) };
     for (const s of series) p[s.key] = Number(r[s.key]);
     return p;
   });
 
-  return { xKey, granularity: xKey.split('.').pop(), series, points };
+  return { xKey, granularity, series, points, grouped: false };
 }
 
 function ChartView({ chart }) {

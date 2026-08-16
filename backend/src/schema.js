@@ -1,5 +1,5 @@
 // 语义层元数据：LLM 只能看到这一层，绝不暴露原始表结构 / SQL。
-// 每个银行一个 cube（同一底层表按 bank 过滤），LLM 依据问题中的银行路由到对应 cube。
+// 每个银行一个 cube（同一底层表按 bank 过滤），另有统一 cube BankIncomeStatement（含 bank 维度）用于跨银行对比。
 
 const MEASURES = [
   { name: 'netInterestIncome', title: '净利息收入 NII' },
@@ -32,14 +32,26 @@ export const BANK_ROUTING = BANKS.map((b) => ({
   title: b.title,
 }));
 
+const perBankCubes = BANKS.map((b) => ({
+  name: b.cube,
+  bank: b.bank,
+  title: b.title,
+  description: `${b.title} 利润表，包含净利息收入 NII、总营收、净利润等指标（演示用近似数据）。`,
+  measures: MEASURES.map((m) => ({ name: m.name, title: m.title })),
+  dimensions: DIMENSIONS,
+}));
+
+const comparisonCube = {
+  name: 'BankIncomeStatement',
+  bank: null,
+  title: '全部银行（跨银行对比）',
+  description: '所有银行利润表，含 bank 维度，用于跨银行对比 NII 等指标（演示用近似数据）。',
+  measures: MEASURES.map((m) => ({ name: m.name, title: m.title })),
+  dimensions: [{ name: 'bank', title: '银行', type: 'string' }, ...DIMENSIONS],
+};
+
 export const SEMANTIC_LAYER = {
   banks: BANK_ROUTING,
-  cubes: BANKS.map((b) => ({
-    name: b.cube,
-    bank: b.bank,
-    title: b.title,
-    description: `${b.title} 利润表，包含净利息收入 NII、总营收、净利润等指标（演示用近似数据）。`,
-    measures: MEASURES.map((m) => ({ name: m.name, title: m.title })),
-    dimensions: DIMENSIONS,
-  })),
+  comparisonCube: comparisonCube.name,
+  cubes: [...perBankCubes, comparisonCube],
 };

@@ -3,9 +3,10 @@ import { askRag } from './api.js';
 import DataView, { DataTable } from './DataView.jsx';
 
 const EXAMPLES = [
-  '2023年汇丰净利息收入是多少？',
+  '5家银行 NII 近五年对比',
+  'What was JPMorgan\'s net interest income in 2023?',
   '汇丰近五年总营收趋势',
-  '汇丰 2022 年净利润',
+  '花旗集团 2022 年净利润',
 ];
 
 let seq = 0;
@@ -47,15 +48,26 @@ function AuditLog({ result }) {
             </div>
           )}
 
-          <div className="audit-row">
-            <div className="audit-label">查询 JSON</div>
-            <pre>{JSON.stringify(result.query, null, 2)}</pre>
-          </div>
+          {result.query && (
+            <div className="audit-row">
+              <div className="audit-label">查询 JSON</div>
+              <pre>{JSON.stringify(result.query, null, 2)}</pre>
+            </div>
+          )}
 
-          <div className="audit-row">
-            <div className="audit-label">原始数据</div>
-            <DataTable data={result.data} />
-          </div>
+          {Array.isArray(result.data) && result.data.length > 0 && (
+            <div className="audit-row">
+              <div className="audit-label">原始数据</div>
+              <DataTable data={result.data} />
+            </div>
+          )}
+
+          {result.detail && (
+            <div className="audit-row">
+              <div className="audit-label">备注</div>
+              <div className="audit-detail">{result.detail}</div>
+            </div>
+          )}
 
           {steps.length > 0 && (
             <div className="audit-row">
@@ -101,28 +113,27 @@ function AuditLog({ result }) {
   );
 }
 
-function AssistantMessage({ result, error }) {
-  if (error) {
-    return (
-      <div className="bubble assistant error-bubble">
-        <div className="bubble-label">助手</div>
-        出错了：{error}
-      </div>
-    );
-  }
+function AssistantMessage({ result }) {
+  const degraded = result.degraded === true;
+  const hasData = Array.isArray(result.data) && result.data.length > 0;
+
   return (
     <div className="bubble assistant">
       <div className="bubble-label">助手</div>
       <div className="answer-text">{result.answer}</div>
 
-      <div className="result-meta">
-        <ConfidenceBadge value={result.confidence} />
-      </div>
+      {typeof result.confidence === 'number' && !degraded && (
+        <div className="result-meta">
+          <ConfidenceBadge value={result.confidence} />
+        </div>
+      )}
 
-      <div className="data-section">
-        <div className="section-title">数据</div>
-        <DataView data={result.data} annotation={result.annotation} />
-      </div>
+      {hasData && (
+        <div className="data-section">
+          <div className="section-title">数据</div>
+          <DataView data={result.data} annotation={result.annotation} />
+        </div>
+      )}
 
       <AuditLog result={result} />
     </div>
@@ -152,8 +163,16 @@ export default function App() {
     try {
       const res = await askRag(q);
       setMessages((m) => [...m, { id: uid(), role: 'assistant', result: res }]);
-    } catch (err) {
-      setMessages((m) => [...m, { id: uid(), role: 'assistant', error: err.message }]);
+    } catch {
+      // 防御性兜底：即使 askRag 异常也不展示原始错误
+      setMessages((m) => [
+        ...m,
+        {
+          id: uid(),
+          role: 'assistant',
+          result: { degraded: true, answer: '抱歉，请求失败，请稍后重试。', confidence: null, data: [], audit: null },
+        },
+      ]);
     } finally {
       setLoading(false);
     }
@@ -187,7 +206,7 @@ export default function App() {
               {m.text}
             </div>
           ) : (
-            <AssistantMessage key={m.id} result={m.result} error={m.error} />
+            <AssistantMessage key={m.id} result={m.result} />
           ),
         )}
 
