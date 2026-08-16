@@ -28,6 +28,7 @@ ${renderSemanticLayer()}
 - "question": 复述用户的问题
 - "query": 合法的 Cube.js Query JSON
 - "reasoning": 简短说明查询思路
+- "confidence": 0 到 1 之间的数字，表示你对 query 与问题匹配程度的信心（0=完全不确定，1=非常确定）
 
 规则：
 - measures / dimensions 必须用全名，例如 "HsbcIncomeStatement.netInterestIncome"
@@ -36,7 +37,7 @@ ${renderSemanticLayer()}
 - 只输出 JSON，不要输出其他内容
 
 示例（用户问 2023 年净利息收入）：
-{"question":"2023年汇丰净利息收入是多少？","query":{"measures":["HsbcIncomeStatement.netInterestIncome"],"timeDimensions":[{"dimension":"HsbcIncomeStatement.periodDate","granularity":"year","dateRange":["2023-01-01","2023-12-31"]}]},"reasoning":"筛选2023年时间范围，汇总NII。"}`;
+{"question":"2023年汇丰净利息收入是多少？","query":{"measures":["HsbcIncomeStatement.netInterestIncome"],"timeDimensions":[{"dimension":"HsbcIncomeStatement.periodDate","granularity":"year","dateRange":["2023-01-01","2023-12-31"]}]},"reasoning":"筛选2023年时间范围，汇总NII。","confidence":0.95}`;
 }
 
 export function buildAnswerSystemPrompt() {

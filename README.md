@@ -55,7 +55,7 @@ cp backend/.env.example backend/.env
 ### 2. 初始化数据（Supabase PostgreSQL）
 
 ```bash
-cd backend && npm install && npm run seed && npm run check
+cd backend && npm install && npm run seed && npm run check 
 ```
 
 `seed` 会执行 `data/init.sql`（建表 + UPSERT 5 行演示数据），`check` 打印表内容。
