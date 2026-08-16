@@ -50,6 +50,32 @@ function AuditLog({ result }) {
             </div>
           )}
 
+          {Array.isArray(audit?.agentResults) && audit.agentResults.length > 0 && (
+            <div className="audit-row">
+              <div className="audit-label">专业 Agent</div>
+              <div className="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Agent</th>
+                      <th>置信度</th>
+                      <th>数据行</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {audit.agentResults.map((a) => (
+                      <tr key={a.id}>
+                        <td>{a.emoji} {a.title}</td>
+                        <td>{a.confidence}%</td>
+                        <td>{(a.data || []).length}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
           {result.query && (
             <div className="audit-row">
               <div className="audit-label">查询 JSON</div>
@@ -122,6 +148,15 @@ function AssistantMessage({ result }) {
   return (
     <div className="bubble assistant">
       <div className="bubble-label">助手</div>
+      {Array.isArray(result.agents) && result.agents.length > 0 && (
+        <div className="agent-badges">
+          {result.agents.map((a) => (
+            <span key={a.id} className="agent-badge">
+              {a.emoji} {a.title}
+            </span>
+          ))}
+        </div>
+      )}
       <div className="answer-text markdown-body">
         <ReactMarkdown remarkPlugins={[remarkGfm]}>{result.answer}</ReactMarkdown>
       </div>

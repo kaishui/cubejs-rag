@@ -1,6 +1,6 @@
 import { config } from './config.js';
 
-async function chatCompletion(messages, { temperature = 0, json = false } = {}) {
+export async function chatCompletion(messages, { temperature = 0, json = false } = {}) {
   if (!config.deepseek.apiKey) {
     throw new Error('DEEPSEEK_API_KEY 未配置。请在 backend/.env（或环境变量）中设置后重试。');
   }
