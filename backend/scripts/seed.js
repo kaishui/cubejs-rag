@@ -25,9 +25,9 @@ async function main() {
   try {
     await client.query(sql);
     const { rows } = await client.query(
-      'SELECT count(*)::int AS n FROM public.hsbc_income_statement',
+      'SELECT count(*)::int AS n FROM public.bank_income_statement',
     );
-    console.log(`[seed] 完成。hsbc_income_statement 现有 ${rows[0].n} 行。`);
+    console.log(`[seed] 完成。bank_income_statement 现有 ${rows[0].n} 行。`);
   } finally {
     await client.end();
   }

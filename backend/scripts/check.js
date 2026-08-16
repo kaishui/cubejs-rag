@@ -19,7 +19,7 @@ async function main() {
   await client.connect();
   try {
     const { rows } = await client.query(
-      'SELECT period_date, report_type, currency, net_interest_income, total_revenue, net_profit FROM public.hsbc_income_statement ORDER BY period_date',
+      'SELECT bank, period_date, report_type, currency, net_interest_income, total_revenue, net_profit FROM public.bank_income_statement ORDER BY bank, period_date',
     );
     console.table(rows);
   } finally {

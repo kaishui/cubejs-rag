@@ -3,6 +3,7 @@
 把 **Cube.js 作为 RAG 的语义层**：LLM 不直接写 SQL，而是根据定义的指标/维度输出 **Cube.js Query JSON**，由 Node 后端调用 Cube.js REST API 取数，再生成自然语言答案。
 
 - 指标口径统一、安全（LLM 只见语义层，不见原始表结构/SQL）
+- 多银行路由：每家银行一个 cube，LLM 依据问题中的银行路由到对应 cube
 - 便于后续扩展 NII finance 场景（NiiByRegion / NiiSensitivity / LoanBook / DepositBook …）
 
 ## 架构
@@ -18,7 +19,7 @@ Node.js 后端（backend/）
       ▼
 Cube.js（语义层，cubejs/model/）
       ▼
-Supabase PostgreSQL（public.hsbc_income_statement，演示用近似数据）
+Supabase PostgreSQL（public.bank_income_statement，多银行，演示用近似数据）
 ```
 
 ## 目录结构
@@ -27,7 +28,7 @@ Supabase PostgreSQL（public.hsbc_income_statement，演示用近似数据）
 .
 ├── data/init.sql                 # 建表 + 示例数据（幂等，可重复执行）
 ├── cubejs/
-│   ├── model/HsbcIncomeStatement.js   # 语义层（measures / dimensions）
+│   ├── model/BankIncomeStatements.js  # 语义层（每家银行一个 cube）
 │   └── Dockerfile                # Render 部署用：把 model 打进镜像
 ├── backend/                      # Node.js RAG 服务（Express）
 │   ├── src/  (server / cube / llm / prompt / schema / config)
